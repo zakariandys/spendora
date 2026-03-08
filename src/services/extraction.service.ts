@@ -30,12 +30,12 @@ Rules:
 - store_name should be cleaned up (no extra whitespace)`;
 
 export async function extractExpenseFromText(ocrText: string): Promise<ExtractedExpense> {
-  logger.info('Sending OCR text to OpenAI for extraction');
+  logger.info('Sending OCR text to Groq for extraction');
 
   const userMessage = `Today's date: ${TODAY()}\n\nOCR Text:\n${ocrText}`;
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: 'llama-3.3-70b-versatile',
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: userMessage },
@@ -50,13 +50,13 @@ export async function extractExpenseFromText(ocrText: string): Promise<Extracted
     throw new Error('OpenAI returned an empty response');
   }
 
-  logger.info('OpenAI raw response', { raw });
+  logger.info('Groq raw response', { raw });
 
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    throw new Error(`OpenAI response is not valid JSON: ${raw}`);
+    throw new Error(`Groq response is not valid JSON: ${raw}`);
   }
 
   return validateExtraction(parsed);

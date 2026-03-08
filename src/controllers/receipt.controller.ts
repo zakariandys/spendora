@@ -30,8 +30,8 @@ export async function handlePhotoMessage(
     logger.error('Failed to download photo', err);
     await sendMessage(
       chatId,
-      '⚠️ Could not download the photo\\. Please try again\\.',
-      'MarkdownV2',
+      '⚠️ Could not download the photo. Please try again.',
+      'HTML',
       messageId,
     );
     return;
@@ -55,8 +55,8 @@ export async function handlePhotoMessage(
     logger.error('OCR failed', err);
     await sendMessage(
       chatId,
-      '⚠️ Could not read the receipt image\\. Please ensure the photo is clear and try again\\.',
-      'MarkdownV2',
+      '⚠️ Could not read the receipt image. Please ensure the photo is clear and try again.',
+      'HTML',
       messageId,
     );
     return;
@@ -70,8 +70,8 @@ export async function handlePhotoMessage(
     logger.error('Extraction failed', err);
     await sendMessage(
       chatId,
-      '⚠️ Could not extract expense details from the receipt\\. Please add the expense manually using `/add`\\.',
-      'MarkdownV2',
+      '⚠️ Could not extract expense details from the receipt. Please add the expense manually.',
+      'HTML',
       messageId,
     );
     return;
@@ -84,8 +84,8 @@ export async function handlePhotoMessage(
     logger.error('DB insert failed', err);
     await sendMessage(
       chatId,
-      '⚠️ Expense was read but could not be saved\\. Please try again\\.',
-      'MarkdownV2',
+      '⚠️ Expense was read but could not be saved. Please try again.',
+      'HTML',
       messageId,
     );
     return;
@@ -96,7 +96,7 @@ export async function handlePhotoMessage(
   await sendMessage(
     chatId,
     formatExpenseConfirmation(expenseRow),
-    'MarkdownV2',
+    'HTML',
     messageId,
   );
 }

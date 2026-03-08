@@ -23,9 +23,9 @@ A Telegram group bot that automatically tracks shared expenses by scanning recei
 
 - Node.js 18+
 - A [Telegram bot token](https://core.telegram.org/bots#botfather)
-- An [OpenAI API key](https://platform.openai.com/api-keys)
-- A [Supabase](https://supabase.com) project
-- [ngrok](https://ngrok.com) (for local webhook testing)
+- A [Groq API key](https://console.groq.com) (free)
+- A [Supabase](https://supabase.com) project (free tier)
+- [ngrok](https://ngrok.com) (for local webhook testing only)
 
 ---
 
@@ -61,6 +61,14 @@ https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
 ```
 
 Look for `"chat": {"id": -1001234567890}` — the **negative number** is your `GROUP_ID`.
+
+### 5. Verify your webhook (optional)
+
+```
+https://api.telegram.org/bot<YOUR_TOKEN>/getWebhookInfo
+```
+
+Returns the currently registered webhook URL and any errors.
 
 ---
 
@@ -103,7 +111,6 @@ ALTER TABLE expenses DISABLE ROW LEVEL SECURITY;
 
 From **Project Settings → API**, copy:
 - `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
 
 ---
@@ -122,9 +129,8 @@ cp .env.example .env
 | `TELEGRAM_BOT_TOKEN` | Token from BotFather |
 | `TELEGRAM_WEBHOOK_URL` | Public HTTPS URL of this server — no trailing slash |
 | `GROUP_ID` | Telegram group chat ID (negative number, e.g. `-1001234567890`) |
-| `OPENAI_API_KEY` | OpenAI API key |
+| `GROQ_API_KEY` | From [console.groq.com](https://console.groq.com) — free |
 | `SUPABASE_URL` | From Supabase project settings |
-| `SUPABASE_ANON_KEY` | From Supabase project settings |
 | `SUPABASE_SERVICE_ROLE_KEY` | From Supabase project settings (used for DB writes and storage) |
 
 ---
@@ -150,16 +156,27 @@ The server starts on `http://localhost:3000`.
 Telegram requires a public HTTPS URL to send updates. Use ngrok:
 
 ```bash
+# Install ngrok
+brew install ngrok
+
+# Add your authtoken (one-time setup)
+ngrok config add-authtoken <YOUR_NGROK_TOKEN>
+
+# Start tunnel
 ngrok http 3000
 ```
 
 Copy the `https://` URL ngrok gives you and set it in `.env`:
 
 ```
-TELEGRAM_WEBHOOK_URL=https://abc123.ngrok.io
+TELEGRAM_WEBHOOK_URL=https://abc123.ngrok-free.app
 ```
 
-Restart the dev server — it will automatically register the webhook with Telegram on startup.
+Restart the dev server — it registers the webhook with Telegram on every startup.
+
+> **Note:** The ngrok URL changes on every restart (free plan). Update `TELEGRAM_WEBHOOK_URL` and restart `npm run dev` each time.
+
+> **Important:** Never run local dev and Render at the same time — whichever server started last will steal the webhook.
 
 ### Health check
 
@@ -182,33 +199,61 @@ npm start       # runs compiled output
 
 ### 1. Push your code to GitHub
 
+```bash
+git push origin master
+```
+
 ### 2. Create a Web Service on Render
 
 1. Go to [render.com](https://render.com) → **New** → **Web Service**
-2. Connect your GitHub repository
+2. Connect your GitHub repository `zakariandys/spendora`
 3. Configure the service:
 
 | Setting | Value |
 |---|---|
+| **Name** | `spendora` |
+| **Branch** | `master` |
 | **Build Command** | `npm install` |
 | **Start Command** | `npm start` |
-| **Node version** | 18 or higher |
+| **Instance Type** | Free |
 
 ### 3. Add environment variables
 
-In the Render dashboard → **Environment**, add every variable from your `.env` file.
+In **Environment**, add all variables from your `.env`:
 
-Set `TELEGRAM_WEBHOOK_URL` to your Render service URL:
+| Key | Value |
+|---|---|
+| `PORT` | `3000` |
+| `TELEGRAM_BOT_TOKEN` | your token |
+| `TELEGRAM_WEBHOOK_URL` | your Render URL (see step 4) |
+| `GROUP_ID` | your group ID |
+| `GROQ_API_KEY` | your Groq key |
+| `SUPABASE_URL` | your Supabase URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | your service role key |
+
+### 4. Set the webhook URL
+
+After deploy, Render gives you a URL like:
+```
+https://spendora.onrender.com
+```
+
+Update `TELEGRAM_WEBHOOK_URL` in Render **Environment**:
+```
+https://spendora.onrender.com
+```
+
+Render auto-restarts — the bot will register the new webhook on boot.
+
+### 5. Verify it's working
 
 ```
-https://your-service-name.onrender.com
+https://api.telegram.org/bot<YOUR_TOKEN>/getWebhookInfo
 ```
 
-### 4. Deploy
+Should show `"url": "https://spendora.onrender.com/webhook"`.
 
-Click **Deploy**. On first boot the bot registers its webhook automatically.
-
-> **Free tier note:** Render free services sleep after 15 minutes of inactivity. The first message after a cold start may take ~30 seconds to respond. Upgrade to a paid plan or add a keep-alive ping for production use.
+> **Free tier note:** Render free services sleep after 15 minutes of inactivity. The first message after a cold start may take ~30 seconds. Upgrade to a paid plan or add a keep-alive cron ping for production use.
 
 ---
 
@@ -218,10 +263,10 @@ Send these commands in the Telegram group:
 
 | Command | What it does |
 |---|---|
-| `/daily` | Shows a category breakdown of **today's** expenses |
-| `/weekly` | Shows a category breakdown of the **last 7 days** |
-| `/monthly` | Shows a category breakdown of the **current calendar month** |
-| `/category <name>` | Filters this month's expenses by a specific category |
+| `/daily` | Category breakdown of **today's** expenses |
+| `/weekly` | Category breakdown of the **last 7 days** |
+| `/monthly` | Category breakdown of the **current calendar month** |
+| `/category <name>` | Filters this month's expenses by category |
 | `/help` | Lists all available commands |
 
 ### Example outputs
@@ -265,7 +310,7 @@ When a member sends a photo in the group, Spendora:
 2. **Downloads** the highest-resolution version of the photo
 3. **Uploads** the image to Supabase Storage and stores the URL
 4. **Runs OCR** on the image using Tesseract.js (English + Japanese)
-5. **Sends the OCR text** to OpenAI (`gpt-4o-mini`) and extracts:
+5. **Sends the OCR text** to Groq (`llama-3.3-70b-versatile`) and extracts:
    - Store name
    - Total amount (as a plain number)
    - Date (normalized to `YYYY-MM-DD`)
@@ -277,7 +322,7 @@ When a member sends a photo in the group, Spendora:
 ✅ Receipt saved!
 🏪 Store: セブンイレブン
 💴 Amount: ¥1,250
-📅 Date: 2024-03-01
+📅 Date: 2026-03-08
 🏷️ Category: Food
 ```
 
@@ -287,7 +332,7 @@ If any step fails, the bot replies with a clear error message and does not save 
 
 ## Supported Categories
 
-OpenAI classifies each receipt into one of these categories:
+Groq classifies each receipt into one of these categories:
 
 | Category | Examples |
 |---|---|
@@ -313,18 +358,18 @@ spendora/
     ├── index.ts                          ← Express server entry point
     ├── controllers/
     │   ├── webhook.controller.ts         ← Receives Telegram updates, enforces group guard
-    │   ├── receipt.controller.ts         ← Photo → OCR → OpenAI → DB pipeline
+    │   ├── receipt.controller.ts         ← Photo → OCR → Groq → DB pipeline
     │   └── command.controller.ts         ← Handles all slash commands
     ├── services/
     │   ├── telegram.service.ts           ← Download photos, send messages, register webhook
     │   ├── ocr.service.ts                ← Tesseract.js wrapper (eng+jpn)
-    │   ├── extraction.service.ts         ← OpenAI structured extraction
+    │   ├── extraction.service.ts         ← Groq structured extraction
     │   ├── storage.service.ts            ← Supabase Storage upload
     │   └── expense.service.ts            ← DB insert and query helpers
     ├── integrations/
     │   ├── supabase.ts                   ← Supabase client (service role)
-    │   └── openai.ts                     ← OpenAI client
+    │   └── openai.ts                     ← Groq client (OpenAI-compatible)
     └── utils/
         ├── logger.ts                     ← Structured console logger
-        └── formatters.ts                 ← Telegram MarkdownV2 message formatters
+        └── formatters.ts                 ← Telegram HTML message formatters
 ```

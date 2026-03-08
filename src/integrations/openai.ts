@@ -3,8 +3,12 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error('Missing OPENAI_API_KEY env var');
+if (!process.env.GROQ_API_KEY) {
+  throw new Error('Missing GROQ_API_KEY env var');
 }
 
-export const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Groq is OpenAI-API compatible — reuse the OpenAI SDK with a custom baseURL
+export const openai = new OpenAI({
+  apiKey: process.env.GROQ_API_KEY,
+  baseURL: 'https://api.groq.com/openai/v1',
+});
