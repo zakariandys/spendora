@@ -12,13 +12,20 @@ export interface SummaryRow {
   count: number;
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 export function formatExpenseConfirmation(expense: ExpenseRow): string {
   return [
-    '✅ *Receipt saved!*',
-    `🏪 Store: ${escapeMarkdown(expense.store_name)}`,
+    '✅ <b>Receipt saved!</b>',
+    `🏪 Store: ${escapeHtml(expense.store_name)}`,
     `💴 Amount: ¥${expense.total_amount.toLocaleString()}`,
     `📅 Date: ${expense.date}`,
-    `🏷️ Category: ${escapeMarkdown(expense.category)}`,
+    `🏷️ Category: ${escapeHtml(expense.category)}`,
   ].join('\n');
 }
 
@@ -28,24 +35,24 @@ export function formatSummary(
   grandTotal: number,
 ): string {
   if (rows.length === 0) {
-    return `📊 *${escapeMarkdown(title)}*\n\nNo expenses found.`;
+    return `📊 <b>${escapeHtml(title)}</b>\n\nNo expenses found.`;
   }
 
-  const lines = rows.map(
-    (r) =>
-      `• ${escapeMarkdown(r.category)}: ¥${r.total.toLocaleString()} (${r.count} receipt${r.count !== 1 ? 's' : ''})`,
-  );
+  const lines = rows.map((r) => {
+    const label = `${r.count} receipt${r.count !== 1 ? 's' : ''}`;
+    return `• ${escapeHtml(r.category)}: ¥${r.total.toLocaleString()} (${label})`;
+  });
 
   return [
-    `📊 *${escapeMarkdown(title)}*`,
+    `📊 <b>${escapeHtml(title)}</b>`,
     '',
     ...lines,
     '',
-    `💰 *Total: ¥${grandTotal.toLocaleString()}*`,
+    `💰 <b>Total: ¥${grandTotal.toLocaleString()}</b>`,
   ].join('\n');
 }
 
+// kept for any remaining callers
 export function escapeMarkdown(text: string): string {
-  // Escape special MarkdownV2 characters
   return text.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, '\\$&');
 }
