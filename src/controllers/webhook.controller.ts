@@ -33,11 +33,16 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
 
   const chatId = message.chat.id;
 
-  // Ignore messages from any chat other than the allowed group
-  if (chatId !== ALLOWED_GROUP_ID()) {
-    logger.warn('Ignored message from unauthorized chat', { chatId });
-    return;
-  }
+  logger.info('DEBUG GROUP CHECK', {
+  incomingChatId: chatId,
+  allowedGroupId: ALLOWED_GROUP_ID(),
+});
+
+if (chatId !== ALLOWED_GROUP_ID()) {
+  logger.warn('Ignored message from unauthorized chat', { chatId });
+  return;
+}
+
 
   logger.info('Received update', {
     updateId: update.update_id,
