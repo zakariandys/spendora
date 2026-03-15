@@ -1,6 +1,8 @@
 import type { Request, Response } from 'express';
 import { handlePhotoMessage } from './receipt.controller';
 import { handleCommand } from './command.controller';
+import { handleChat } from './chat.controller';
+import { handleCallbackQuery } from './edit.controller';
 import { logger } from '../utils/logger';
 
 const ALLOWED_GROUP_ID = () => {
@@ -12,14 +14,21 @@ const ALLOWED_GROUP_ID = () => {
 interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
+  callback_query?: {
+    id: string;
+    data?: string;
+    message?: { message_id: number; chat: { id: number }; text?: string };
+  };
 }
 
 interface TelegramMessage {
   message_id: number;
   chat: { id: number; type: string };
-  from?: { id: number; username?: string };
+  from?: { id: number; username?: string; is_bot?: boolean };
   text?: string;
   photo?: Array<{ file_id: string; width: number; height: number; file_size?: number }>;
+  reply_to_message?: { from?: { is_bot?: boolean } };
+  entities?: Array<{ type: string; offset: number; length: number }>;
 }
 
 export async function webhookHandler(req: Request, res: Response): Promise<void> {
@@ -27,8 +36,16 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
   res.sendStatus(200);
 
   const update = req.body as TelegramUpdate;
-  const message = update.message;
 
+  // Callback query from inline keyboard button tap — must be checked before message guard
+  if (update.callback_query) {
+    await handleCallbackQuery(update.callback_query).catch((err) =>
+      logger.error('Unhandled error in callback query handler', err),
+    );
+    return;
+  }
+
+  const message = update.message;
   if (!message) return;
 
   const chatId = message.chat.id;
@@ -47,14 +64,26 @@ export async function webhookHandler(req: Request, res: Response): Promise<void>
   });
 
   try {
+    // Photos → receipt pipeline (always, no mention needed)
     if (message.photo && message.photo.length > 0) {
       await handlePhotoMessage(message.chat.id, message.message_id, message.photo);
       return;
     }
 
-    if (message.text?.startsWith('/')) {
-      await handleCommand(message.chat.id, message.message_id, message.text);
-      return;
+    if (message.text) {
+      // Slash commands → direct handler
+      if (message.text.startsWith('/')) {
+        await handleCommand(message.chat.id, message.message_id, message.text);
+        return;
+      }
+
+      // Natural language → only when bot is mentioned or message is a reply to bot
+      const isReplyToBot = message.reply_to_message?.from?.is_bot === true;
+      const isMention = message.entities?.some((e) => e.type === 'mention') ?? false;
+
+      if (isReplyToBot || isMention) {
+        await handleChat(message.chat.id, message.message_id, message.text);
+      }
     }
   } catch (err) {
     logger.error('Unhandled error in webhook controller', err);
