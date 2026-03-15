@@ -19,7 +19,7 @@ Required schema:
   "store_name": "string (name of the store or merchant)",
   "total_amount": number (the final total as a plain number, no currency symbols),
   "date": "YYYY-MM-DD (normalize to this format; use today if missing)",
-  "category": "string (one of: Food, Transport, Shopping, Entertainment, Health, Utilities, Other)"
+  "category": "string (one of: Groceries, Dining, Shopping, Transport, Utilities, Health, Entertainment, Other)"
 }
 
 Rules:
