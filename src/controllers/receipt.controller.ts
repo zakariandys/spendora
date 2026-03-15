@@ -1,4 +1,4 @@
-import { downloadTelegramPhoto, sendMessage } from '../services/telegram.service';
+import { downloadTelegramPhoto, sendMessage, sendMessageWithKeyboard } from '../services/telegram.service';
 import { runOcr } from '../services/ocr.service';
 import { extractExpenseFromText } from '../services/extraction.service';
 import { uploadReceiptImage } from '../services/storage.service';
@@ -78,8 +78,9 @@ export async function handlePhotoMessage(
   }
 
   // 5. Insert into DB
+  let expenseId: string;
   try {
-    await insertExpense({ ...extracted, image_url: imageUrl, raw_text: ocrText });
+    expenseId = await insertExpense({ ...extracted, image_url: imageUrl, raw_text: ocrText });
   } catch (err) {
     logger.error('DB insert failed', err);
     await sendMessage(
@@ -91,12 +92,18 @@ export async function handlePhotoMessage(
     return;
   }
 
-  // 6. Confirm to group
+  // 6. Confirm to group with category correction buttons
+  const CATEGORIES = ['Groceries', 'Dining', 'Shopping', 'Transport', 'Utilities', 'Health', 'Entertainment', 'Other'];
+  const keyboard = [
+    CATEGORIES.slice(0, 4).map((cat) => ({ text: cat, callback_data: `edit_cat:${expenseId}:${cat}` })),
+    CATEGORIES.slice(4).map((cat) => ({ text: cat, callback_data: `edit_cat:${expenseId}:${cat}` })),
+  ];
+
   const expenseRow = { ...extracted, image_url: imageUrl };
-  await sendMessage(
+  await sendMessageWithKeyboard(
     chatId,
-    formatExpenseConfirmation(expenseRow),
-    'HTML',
+    formatExpenseConfirmation(expenseRow) + '\n\n<i>Wrong category? Tap to fix:</i>',
+    keyboard,
     messageId,
   );
 }

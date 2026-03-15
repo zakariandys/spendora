@@ -10,23 +10,36 @@ export interface InsertExpensePayload extends ExtractedExpense {
   raw_text: string;
 }
 
-export async function insertExpense(payload: InsertExpensePayload): Promise<void> {
+export async function insertExpense(payload: InsertExpensePayload): Promise<string> {
   logger.info('Inserting expense into DB', { store: payload.store_name });
 
-  const { error } = await supabase.from(TABLE).insert({
+  const { data, error } = await supabase.from(TABLE).insert({
     store_name: payload.store_name,
     total_amount: payload.total_amount,
     date: payload.date,
     category: payload.category,
     image_url: payload.image_url,
     raw_text: payload.raw_text,
-  });
+  }).select('id').single();
 
   if (error) {
     throw new Error(`DB insert failed: ${error.message}`);
   }
 
-  logger.info('Expense inserted successfully');
+  logger.info('Expense inserted successfully', { id: data.id });
+  return data.id as string;
+}
+
+export async function updateExpenseCategory(id: string, category: string): Promise<void> {
+  logger.info('Updating expense category', { id, category });
+
+  const { error } = await supabase.from(TABLE).update({ category }).eq('id', id);
+
+  if (error) {
+    throw new Error(`DB update failed: ${error.message}`);
+  }
+
+  logger.info('Expense category updated');
 }
 
 // ---------- Query helpers ----------

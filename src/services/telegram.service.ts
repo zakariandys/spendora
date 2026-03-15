@@ -60,6 +60,66 @@ export async function sendMessage(
   }
 }
 
+interface InlineKeyboardButton {
+  text: string;
+  callback_data: string;
+}
+
+export async function sendMessageWithKeyboard(
+  chatId: number,
+  text: string,
+  keyboard: InlineKeyboardButton[][],
+  replyToMessageId?: number,
+): Promise<number> {
+  try {
+    const res = await axios.post<{ ok: boolean; result: { message_id: number } }>(
+      `${BASE_URL()}/sendMessage`,
+      {
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+        reply_to_message_id: replyToMessageId,
+        reply_markup: { inline_keyboard: keyboard },
+      },
+    );
+    return res.data.result.message_id;
+  } catch (err) {
+    logger.error('Failed to send Telegram message with keyboard', err);
+    return 0;
+  }
+}
+
+export async function editMessageText(
+  chatId: number,
+  messageId: number,
+  text: string,
+): Promise<void> {
+  try {
+    await axios.post(`${BASE_URL()}/editMessageText`, {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: 'HTML',
+    });
+  } catch (err) {
+    logger.error('Failed to edit Telegram message', err);
+  }
+}
+
+export async function answerCallbackQuery(
+  callbackQueryId: string,
+  text?: string,
+): Promise<void> {
+  try {
+    await axios.post(`${BASE_URL()}/answerCallbackQuery`, {
+      callback_query_id: callbackQueryId,
+      text,
+    });
+  } catch (err) {
+    logger.error('Failed to answer callback query', err);
+  }
+}
+
 /**
  * Register the webhook with Telegram.
  */
