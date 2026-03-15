@@ -17,7 +17,14 @@ function dateRange(type: 'daily' | 'weekly' | 'monthly'): { from: string; to: st
     d.setDate(d.getDate() - 6);
     fromDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   } else {
-    fromDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+    // Billing cycle: 26th of prev month → 25th of current month.
+    // If today is past the 25th, the active cycle is 26th of this month → 25th of next month.
+    const day = now.getDate();
+    const cycleStart =
+      day <= 25
+        ? new Date(now.getFullYear(), now.getMonth() - 1, 26)
+        : new Date(now.getFullYear(), now.getMonth(), 26);
+    fromDate = `${cycleStart.getFullYear()}-${pad(cycleStart.getMonth() + 1)}-26`;
   }
 
   return { from: fromDate, to: toDate };
@@ -56,7 +63,7 @@ export async function handleCommand(
       case '/monthly': {
         const { from, to } = dateRange('monthly');
         const { rows, grandTotal } = await queryExpenses(from, to);
-        await sendMessage(chatId, formatSummary('This Month Expenses', rows, grandTotal), 'HTML', messageId);
+        await sendMessage(chatId, formatSummary(`Monthly Expenses (${from} → ${to})`, rows, grandTotal), 'HTML', messageId);
         break;
       }
 
@@ -72,7 +79,7 @@ export async function handleCommand(
         await sendMessage(
           chatId,
           formatSummary(
-            `${categoryName} — This Month`,
+            `${categoryName} (${from} → ${to})`,
             rows.filter((r) => r.category.toLowerCase() === categoryName.toLowerCase()),
             grandTotal,
           ),
